@@ -1,0 +1,1 @@
+java -cp "Í¼Æ¬ĞòÁĞ×ªbin.jar" kuresaru.badapple.DataGen
