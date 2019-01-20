@@ -1,0 +1,186 @@
+C51 COMPILER V9.59.0.0   PLAYER                                                            01/19/2019 20:05:14 PAGE 1   
+
+
+C51 COMPILER V9.59.0.0, COMPILATION OF MODULE PLAYER
+OBJECT MODULE PLACED IN .\Objects\player.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE player.c COMPACT OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Lis
+                    -tings\player.lst) TABS(2) OBJECT(.\Objects\player.obj)
+
+line level    source
+
+   1          #include <STC89C5xRC.H>
+   2          #include "12864.h"
+   3          #include "delay.h"
+   4          #include "serial.h"
+   5          #include "max7219.h"
+   6          #include "sdcard.h"
+   7          #include "fs.h"
+   8          
+   9          #define uchar unsigned char
+  10          #define ulong unsigned long int
+  11            
+  12          #define TH 0xF1
+  13          #define TL 0xC8  // 调速度  F1Cx  后4位不确定
+  14          
+  15          sbit BTN_D = P1^6;
+  16          sbit BTN_C = P1^4;
+  17          
+  18          extern ulong FILE_BadApple_StartClust;
+  19          extern uchar FS_SectorPerClust;
+  20          extern uchar FS_SectorPerClust;
+  21          extern ulong FS_FatUseSector;
+  22          extern ulong FS_FatSector;
+  23          
+  24          bit Player_Playing;
+  25          bit Player_WaitNextFrame;
+  26          uchar frame[32];
+  27          uchar timer = 0;
+  28          
+  29          void waitC() {
+  30   1        while (!BTN_C);
+  31   1        delay(100);
+  32   1      }
+  33          
+  34          void waitD() {
+  35   1        while (!BTN_D);
+  36   1        delay(100);
+  37   1      }
+  38          
+  39          void Timer1Init(void)
+  40          {
+  41   1        TMOD |= 0x10;
+  42   1        TH1 = TH;
+  43   1        TL1 = TL;
+  44   1        ET1 = 1;
+  45   1        TR1 = 1;
+  46   1      }
+  47          
+  48          void Player_Test() {
+  49   1        uchar i, j;
+  50   1        LCD12864_Clear();
+  51   1        LCD12864_WriteText("音频测试中...");
+  52   1        Player_Playing = 1;
+  53   1        Serial_Send(0x7E);
+  54   1        Serial_Send(0xFF);
+C51 COMPILER V9.59.0.0   PLAYER                                                            01/19/2019 20:05:14 PAGE 2   
+
+  55   1        Serial_Send(0x06);
+  56   1        Serial_Send(0x03);
+  57   1        Serial_Send(0x00);
+  58   1        Serial_Send(0x00);
+  59   1        Serial_Send(0x03);
+  60   1        Serial_Send(0xFE);
+  61   1        Serial_Send(0xF5);
+  62   1        Serial_Send(0xEF);
+  63   1        while (Player_Playing);
+  64   1        LCD12864_Positon(1, 0);
+  65   1        LCD12864_WriteText("按Ｃ键继续...");
+  66   1        waitC();
+  67   1        LCD12864_Positon(2, 0);
+  68   1        LCD12864_WriteText("图像测试中...");
+  69   1        LCD12864_Positon(3, 0);
+  70   1        j = 0x80;
+  71   1        for (i = 0; i < 8; i++) {
+  72   2          MAX7219_WriteAll(1, j);
+  73   2          MAX7219_WriteAll(2, j);
+  74   2          MAX7219_WriteAll(3, j);
+  75   2          MAX7219_WriteAll(4, j);
+  76   2          MAX7219_WriteAll(5, j);
+  77   2          MAX7219_WriteAll(6, j);
+  78   2          MAX7219_WriteAll(7, j);
+  79   2          MAX7219_WriteAll(8, j);
+  80   2          j >>= 1;
+  81   2          delay(100);
+  82   2        }
+  83   1        for (i = 0; i < 8; i++) {
+  84   2          MAX7219_WriteAll(1, i == 0 ? 0xFF : 0x00);
+  85   2          MAX7219_WriteAll(2, i == 1 ? 0xFF : 0x00);
+  86   2          MAX7219_WriteAll(3, i == 2 ? 0xFF : 0x00);
+  87   2          MAX7219_WriteAll(4, i == 3 ? 0xFF : 0x00);
+  88   2          MAX7219_WriteAll(5, i == 4 ? 0xFF : 0x00);
+  89   2          MAX7219_WriteAll(6, i == 5 ? 0xFF : 0x00);
+  90   2          MAX7219_WriteAll(7, i == 6 ? 0xFF : 0x00);
+  91   2          MAX7219_WriteAll(8, i == 7 ? 0xFF : 0x00);
+  92   2          delay(100);
+  93   2        }
+  94   1        MAX7219_WriteAll(8, 0);
+  95   1        LCD12864_WriteText("按Ｄ键继续...");
+  96   1        waitD();
+  97   1      }
+  98          
+  99          void Player_ReDisplay() {
+ 100   1        uchar i;
+ 101   1        for (i = 0; i < 8; i++)
+ 102   1          MAX7219_Write(i + 1, frame[i], frame[i + 8], frame[i + 16], frame[i + 24]);
+ 103   1        Player_WaitNextFrame = 1;
+ 104   1      }
+ 105          
+ 106          void Player_ReceiveFrame() {
+ 107   1        uchar i;
+ 108   1        for (i = 0; i < 32; i++) {
+ 109   2          frame[i] = SD_Data_Read();
+ 110   2        }
+ 111   1      }
+ 112          
+ 113          void Player_Play() {
+ 114   1        ulong nextClust = FILE_BadApple_StartClust;
+ 115   1        ulong rootSector = FS_FatSector + FS_FatUseSector + FS_FatUseSector;
+ 116   1        uchar clustSector;
+C51 COMPILER V9.59.0.0   PLAYER                                                            01/19/2019 20:05:14 PAGE 3   
+
+ 117   1        uchar i;
+ 118   1        
+ 119   1        ET1 = 1;
+ 120   1        Timer1Init();
+ 121   1        SD_Start();
+ 122   1        Serial_Send(0x7E);
+ 123   1        Serial_Send(0xFF);
+ 124   1        Serial_Send(0x06);
+ 125   1        Serial_Send(0x03);
+ 126   1        Serial_Send(0x00);
+ 127   1        Serial_Send(0x00);
+ 128   1        Serial_Send(0x02);
+ 129   1        Serial_Send(0xFE);
+ 130   1        Serial_Send(0xF6);
+ 131   1        Serial_Send(0xEF);
+ 132   1        for (nextClust = FILE_BadApple_StartClust; nextClust != 0x0FFFFFFF; nextClust = FS_GetNextClust(nextClust
+             -)) { // 所有簇
+ 133   2          for (clustSector = 0; clustSector < FS_SectorPerClust; clustSector++) { // 所有扇区
+ 134   3            SD_StartReadBlock(rootSector + ((nextClust - 2) * FS_SectorPerClust) + clustSector);
+ 135   3            for (i = 0; i < 16; i++) { // 32*16=512  一个扇区有16帧
+ 136   4              Player_ReceiveFrame();
+ 137   4              Player_ReDisplay();
+ 138   4              while (Player_WaitNextFrame);
+ 139   4            }
+ 140   3            SD_Data_Read();
+ 141   3            SD_Data_Read();
+ 142   3          }
+ 143   2        }
+ 144   1        TR1 = 0;
+ 145   1        SD_Stop();  // 不知道哪的问题  好像到不了这
+ 146   1        LCD12864_Positon(3, 0);
+ 147   1        LCD12864_WriteText("    播放完成    ");
+ 148   1      }
+ 149          
+ 150          void Timer1() interrupt 3 {
+ 151   1        TH1 = TH;
+ 152   1        TL1 = TL;
+ 153   1        if (timer++ > 20) {
+ 154   2          timer = 0;
+ 155   2          Player_WaitNextFrame = 0;
+ 156   2        }
+ 157   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1004    ----
+   CONSTANT SIZE    =     73    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =     33      14
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      2    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

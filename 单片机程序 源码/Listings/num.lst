@@ -1,0 +1,62 @@
+C51 COMPILER V9.59.0.0   NUM                                                               01/19/2019 20:05:14 PAGE 1   
+
+
+C51 COMPILER V9.59.0.0, COMPILATION OF MODULE NUM
+OBJECT MODULE PLACED IN .\Objects\num.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE num.c COMPACT OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listin
+                    -gs\num.lst) TABS(2) OBJECT(.\Objects\num.obj)
+
+line level    source
+
+   1          #include "num.h"
+   2          
+   3          #define uchar unsigned char
+   4          #define uint unsigned int
+   5          #define ulong unsigned long int
+   6          
+   7          // 把ulong转换成8个Hex ASCII码
+   8          uchar * ul2hstr(ulong ul) {
+   9   1        uchar str[8];
+  10   1        uchar i, j;
+  11   1        for (i = 0; i < 8; i++) {
+  12   2          j = ((ul >> (28 - i * 4)) & 0xF) + 0x30;
+  13   2          if (j > 0x39)
+  14   2            j += 7;
+  15   2          str[i] = j;
+  16   2        }
+  17   1        return str;
+  18   1      }
+  19          
+  20          // 把uchar转换成3个Dec ASCII码
+  21          uchar * uc2dstr(uchar uc) {
+  22   1        uchar str[3];
+  23   1        str[0] = uc / 100 + 0x30;
+  24   1        str[1] = uc % 100 / 10 + 0x30;
+  25   1        str[2] = uc % 10 + 0x30;
+  26   1        return str;
+  27   1      }
+  28          
+  29          // 把uint转换成5个Dec ASCII码
+  30          uchar * ui2dstr(uint ui) {
+  31   1        uchar str[5];
+  32   1        str[0] = ui / 10000 + 0x30;
+  33   1        str[1] = ui % 10000 / 1000 + 0x30;
+  34   1        str[2] = ui % 1000 / 100 + 0x30;
+  35   1        str[3] = ui % 100 / 10 + 0x30;
+  36   1        str[4] = ui % 10 + 0x30;
+  37   1        return str;
+  38   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    262    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----      21
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

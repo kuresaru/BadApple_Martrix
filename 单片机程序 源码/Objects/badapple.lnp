@@ -1,0 +1,12 @@
+".\Objects\STARTUP.obj",
+".\Objects\delay.obj",
+".\Objects\main.obj",
+".\Objects\sdcard.obj",
+".\Objects\12864.obj",
+".\Objects\num.obj",
+".\Objects\fs.obj",
+".\Objects\max7219.obj",
+".\Objects\player.obj",
+".\Objects\serial.obj" 
+TO ".\Objects\badapple" 
+PRINT(".\Listings\badapple.m51") RAMSIZE(256) 

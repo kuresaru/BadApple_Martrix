@@ -1,0 +1,213 @@
+C51 COMPILER V9.59.0.0   SDCARD                                                            01/19/2019 20:05:13 PAGE 1   
+
+
+C51 COMPILER V9.59.0.0, COMPILATION OF MODULE SDCARD
+OBJECT MODULE PLACED IN .\Objects\sdcard.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE sdcard.c COMPACT OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Lis
+                    -tings\sdcard.lst) TABS(2) OBJECT(.\Objects\sdcard.obj)
+
+line level    source
+
+   1          #include <reg52.h>
+   2          #include <intrins.h>
+   3          #include "delay.h"
+   4          #include "serial.h"
+   5          #include "sdcard.h"
+   6          
+   7          #define uchar unsigned char
+   8          #define ulong unsigned long int
+   9          
+  10          sbit MOSI = P2^1;
+  11          sbit MISO = P2^3;
+  12          sbit CS = P2^0;
+  13          sbit CLK = P2^2;
+  14          
+  15          #define WAIT_COUNT      30
+  16          
+  17          struct SD_INFO SD_Info;
+  18          
+  19          
+  20          void SD_Data_Send(uchar dat) {
+  21   1        uchar i;
+  22   1        for (i = 0; i < 8; i++) {
+  23   2          MOSI = dat & 0x80;
+  24   2          dat <<= 1;
+  25   2          CLK = 1;
+  26   2          CLK = 0;
+  27   2        }
+  28   1      }
+  29          
+  30          uchar SD_Data_Read() {
+  31   1        uchar i, tmp = 0;
+  32   1        for (i = 0; i < 8; i++) {
+  33   2          tmp <<= 1;
+  34   2          CLK = 1;
+  35   2          if (MISO)
+  36   2            tmp |= 1;
+  37   2          CLK = 0;
+  38   2        }
+  39   1        return tmp;
+  40   1      }
+  41          
+  42          uchar SD_Command(uchar cmd, uchar arg0, uchar arg1, uchar arg2, uchar arg3, uchar crc) {
+  43   1        uchar i = WAIT_COUNT, tmp;
+  44   1        SD_Data_Send(cmd);
+  45   1        SD_Data_Send(arg0);
+  46   1        SD_Data_Send(arg1);
+  47   1        SD_Data_Send(arg2);
+  48   1        SD_Data_Send(arg3);
+  49   1        SD_Data_Send(crc);
+  50   1        SD_Data_Read();
+  51   1        do {
+  52   2          tmp = SD_Data_Read();
+  53   2        } while (i-- && tmp == 0xFF); // 正常情况下最高位永远是0?
+  54   1        return tmp;
+C51 COMPILER V9.59.0.0   SDCARD                                                            01/19/2019 20:05:13 PAGE 2   
+
+  55   1      }
+  56          
+  57          void SD_Start() {
+  58   1        CS = 1;
+  59   1        SD_Data_Send(0xFF);
+  60   1        CS = 0;
+  61   1      }
+  62          
+  63          void SD_Stop() {
+  64   1        CS = 1;
+  65   1      }
+  66          
+  67          bit SD_Init() {
+  68   1        uchar i, tmp;
+  69   1        
+  70   1        CLK = 1;
+  71   1        CS = 1;
+  72   1        MOSI = 1;
+  73   1        MISO = 1;
+  74   1        SD_Info.SD_Type = UNINITIALIZED;
+  75   1        
+  76   1        // 初始化时钟
+  77   1        for (i = 0; i < 120; i++) {
+  78   2          _nop_();
+  79   2          _nop_();
+  80   2          CLK = 0;
+  81   2          _nop_();
+  82   2          _nop_();
+  83   2          CLK = 1;
+  84   2        }
+  85   1        CLK = 0;
+  86   1        
+  87   1        // CMD0 让卡复位
+  88   1        Delay100us();
+  89   1        SD_Start();
+  90   1        tmp = SD_Command(0x40, 0x00, 0x00, 0x00, 0x00, 0x95); // CMD0
+  91   1        SD_Stop();
+  92   1        if (tmp != 0x01) {
+  93   2          return 0;
+  94   2        }
+  95   1        
+  96   1        // CMD8 如果正常响应为SD2.0  错误为SD1.0
+  97   1        Delay100us();
+  98   1        SD_Start();
+  99   1        tmp = SD_Command(0x48, 0x00, 0x00, 0x01, 0xAA, 0x87); // CMD8
+ 100   1        SD_Data_Read();
+ 101   1        SD_Data_Read();
+ 102   1        SD_Data_Read();//cmd8返回是R7 后边还有4个字节
+ 103   1        SD_Data_Read();
+ 104   1        SD_Stop();
+ 105   1        if(tmp == 0x01) {
+ 106   2          // 是2.0
+ 107   2          SD_Info.SD_Type = SD_2;
+ 108   2          // 初始化
+ 109   2          i = WAIT_COUNT;
+ 110   2          do {
+ 111   3            Delay100us();
+ 112   3            SD_Start();
+ 113   3            SD_Command(0x77, 0x00, 0x00, 0x00, 0x00, 0xFF); // CMD55
+ 114   3            tmp = SD_Command(0x69, 0x40, 0x00, 0x00, 0x00, 0xFF); // ACMD41
+ 115   3            SD_Stop();
+ 116   3          } while ((tmp & 0x01) && i--);
+C51 COMPILER V9.59.0.0   SDCARD                                                            01/19/2019 20:05:13 PAGE 3   
+
+ 117   2          if (!i)
+ 118   2            return 0;
+ 119   2          
+ 120   2          // 检查是不是SDHC
+ 121   2          Delay100us();
+ 122   2          SD_Start();
+ 123   2          SD_Command(0x7A, 0x00, 0x00, 0x00, 0x00, 0xFF); // CMD58
+ 124   2          tmp = SD_Data_Read();
+ 125   2          SD_Data_Read();
+ 126   2          SD_Data_Read();
+ 127   2          SD_Data_Read();
+ 128   2          SD_Stop();
+ 129   2          if (tmp & 0x40) {
+ 130   3            SD_Info.SD_Type = SD_HC;
+ 131   3          }
+ 132   2          return 0; //不知道为什么2.0卡不能用
+ 133   2        } else if (tmp == 0x05) {
+ 134   2          // 检查是1.0还是MMC
+ 135   2          Delay100us();
+ 136   2          SD_Start();
+ 137   2          i = WAIT_COUNT;
+ 138   2          do {
+ 139   3            SD_Command(0x77, 0x00, 0x00, 0x00, 0x00, 0xFF); // CMD55
+ 140   3            tmp = SD_Command(0x69, 0x00, 0x00, 0x00, 0x00, 0xFF); // ACMD41
+ 141   3          } while (i-- && (tmp & 0x01)); //好像最后一位是0就可以了
+ 142   2          if (i) { // 重试次数内完成
+ 143   3            SD_Stop();
+ 144   3            SD_Info.SD_Type = SD_1;
+ 145   3            return 1; //成功
+ 146   3          } else { // 看看是不是MMC
+ 147   3            tmp = SD_Command(0x41, 0x00, 0x00, 0x00, 0x00, 0xFF); // CMD1
+ 148   3            if (!tmp) {  // 这到底是0还是是算成功...
+ 149   4              SD_Info.SD_Type = SD_MMC;
+ 150   4              return 1;
+ 151   4            } else {
+ 152   4              return 0;
+ 153   4            }
+ 154   3          }
+ 155   2        } else {
+ 156   2          return 0;
+ 157   2        }
+ 158   1      }
+ 159          
+ 160          /**
+ 161            开始读 扇区地址 0才是成功 之后手动读512字节内容和2字节crc 
+ 162          */
+ 163          bit SD_StartReadBlock(ulong address) {
+ 164   1        uchar tmp, i;
+ 165   1        if (SD_Info.SD_Type != SD_HC) {
+ 166   2          address <<= 9; // *512
+ 167   2        }
+ 168   1        i = WAIT_COUNT;
+ 169   1        do {
+ 170   2          tmp = SD_Command(0x51, (address >> 24) & 0xFF, (address >> 16) & 0xFF, (address >> 8) & 0xFF, address & 
+             -0xFF, 0xFF); //CMD17
+ 171   2        } while (i-- && tmp);
+ 172   1        if (tmp == 0) {
+ 173   2          i = WAIT_COUNT;
+ 174   2          do
+ 175   2            tmp = SD_Data_Read();
+ 176   2          while (i-- && tmp != 0xFE);
+ 177   2          if (i)
+C51 COMPILER V9.59.0.0   SDCARD                                                            01/19/2019 20:05:13 PAGE 4   
+
+ 178   2            return 1;
+ 179   2          return 0;
+ 180   2        }
+ 181   1        return 0;
+ 182   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    642    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =      1      12
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

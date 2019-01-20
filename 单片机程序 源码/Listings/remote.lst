@@ -1,0 +1,57 @@
+C51 COMPILER V9.59.0.0   REMOTE                                                            01/19/2019 09:26:31 PAGE 1   
+
+
+C51 COMPILER V9.59.0.0, COMPILATION OF MODULE REMOTE
+OBJECT MODULE PLACED IN .\Objects\remote.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE remote.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\re
+                    -mote.lst) TABS(2) OBJECT(.\Objects\remote.obj)
+
+line level    source
+
+   1          /*P1.7 -> D0
+   2            P1.6 -> D1
+   3            P1.5 -> D2
+   4            P1.4 -> D3
+   5            P3.2 -> VT*/
+   6          #include <reg52.h>
+   7          #include "delay.h"
+   8          
+   9          #define uchar unsigned char
+  10          
+  11          sbit BTN_B = P1^7;
+  12          sbit BTN_D = P1^6;
+  13          sbit BTN_A = P1^5;
+  14          sbit BTN_C = P1^4;
+  15          
+  16          extern bit flag_Continue;
+  17          
+  18          void Remote_InitInterrupt0() {
+  19   1        IT1 = 0; // 低电平触发
+  20   1        EX1 = 1; // 打开外部中断 //有问题?  好像是引脚上有冲突
+  21   1        EA = 1; // 开总中断
+  22   1      }
+  23          
+  24          void IT0_Remote() interrupt 2 {
+  25   1        if (BTN_A) {
+  26   2          flag_Continue = 0;
+  27   2        } else if (BTN_B) {
+  28   2        } else if (BTN_C) {
+  29   2        } else if (BTN_D) {
+  30   2        }
+  31   1        while (BTN_A || BTN_B || BTN_C || BTN_D);
+  32   1        delay(100);
+  33   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     87    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
